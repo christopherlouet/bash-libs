@@ -1,0 +1,9 @@
+.idea
+.vscode
+*.retry
+
+.pytest_cache/
+tests/.pytest_cache/
+**/__pycache__
+
+libs/.*

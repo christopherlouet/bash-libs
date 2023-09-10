@@ -1,0 +1,9 @@
+.dockerignore
+.idea
+.vscode
+*.retry
+.git
+.gitignore
+.pytest_cache
+Dockerfile
+tests.sh
