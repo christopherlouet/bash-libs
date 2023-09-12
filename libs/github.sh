@@ -82,11 +82,16 @@ release_verify() {
 #
 # Returns the release name.
 release_choice() {
+  test_answer=$1
   release=""
   while [ -z "$release" ]; do
-    read -r -p "Enter release version: " release_response
+    if [ -z "$test_answer" ]; then
+      read -r -p "Enter release version: " release_response
+    else
+      if [ "$test_answer" = "no_answer" ]; then release_response=""; else release_response=$test_answer; fi
+    fi
     release=$(release_verify "$release_response")
-    if [ -z "$release" ]; then show_message "$release is not a valid version!" 1; fi
+    if [ -z "$release" ]; then show_message "'$release' is not a valid version!" 1; fi
   done
   echo "$release"
 }

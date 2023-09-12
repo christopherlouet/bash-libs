@@ -47,13 +47,13 @@ show_message() {
 # $3 - Expected answer, used for unit test.
 #
 # Returns "y" if the user's response is "yes" or "y".
-show_confirm_message() {
+confirm_message() {
   default_answer=$2
   test_answer=$3
   if [ -z "$test_answer" ]; then
     read -r -p "$1" answer
   else
-    answer=$test_answer
+    if [ "$test_answer" = "no_answer" ]; then answer=""; else answer=$test_answer; fi
   fi
   if [ -z "$answer" ]; then
     echo "$default_answer" && exit
