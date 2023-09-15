@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 
-CURRENT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-GITHUB_ENV_FILE="$CURRENT_DIR/.github"
-LIB_MESSAGES="$CURRENT_DIR/messages.sh"
-LIB_UTILS="$CURRENT_DIR/utils.sh"
+LIBS_FOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+GITHUB_ENV_FILE="$LIBS_FOLDER/.github"
+LIB_MESSAGES="$LIBS_FOLDER/messages.sh"
+LIB_UTILS="$LIBS_FOLDER/utils.sh"
+GITHUB_BASE_URL=https://github.com
+GITHUB_API_URL=https://api.github.com
 
 show_message() { bash "$LIB_MESSAGES" "${FUNCNAME[0]}" "$@"; }
 show_confirm_message() { bash "$LIB_MESSAGES" "${FUNCNAME[0]}" "$@"; }
@@ -25,36 +27,28 @@ load_env() {
 #
 # Returns nothing.
 init() {
-  GITHUB_PROJECT_NAME=$1
   # Project name
-  if [ -z "$GITHUB_PROJECT_NAME" ]; then show_message "Please provide the project path" 1; fi
+  GITHUB_PROJECT_NAME=$1 && [[ -z "$GITHUB_PROJECT_NAME" ]] &&
+    { show_message "Please provide the project path" 1; exit $?; }
   # Project folder
-  if [ -z "$2" ]; then
-    PROJECT_FOLDER=$CURRENT_DIR/../$(echo "$GITHUB_PROJECT_NAME"|rev|cut -d"/" -f1|rev)
-  else
-    PROJECT_FOLDER=$2
-  fi
+  PROJECT_FOLDER=${2:-$LIBS_FOLDER/../$(echo "$GITHUB_PROJECT_NAME"|rev|cut -d"/" -f1|rev)}
   # Api token
   GITHUB_API_TOKEN=$3
-
+  # Project API url
+  PROJECT_API_URL="$GITHUB_API_URL/repos/$GITHUB_PROJECT_NAME"
   # Initializing environment variables
-  GITHUB_BASE_URL=https://github.com
-  GITHUB_API_URL=https://api.github.com/repos
-  LIBS_FOLDER=$CURRENT_DIR
-  PROJECT_API=$GITHUB_API_URL/$GITHUB_PROJECT_NAME
-
-  declare -A ENV_PARAMS
-  ENV_PARAMS[GITHUB_PROJECT_NAME]=$GITHUB_PROJECT_NAME
-  ENV_PARAMS[GITHUB_BASE_URL]=$GITHUB_BASE_URL
-  ENV_PARAMS[GITHUB_API_URL]=$GITHUB_API_URL
-  ENV_PARAMS[GITHUB_API_TOKEN]=$GITHUB_API_TOKEN
-  ENV_PARAMS[LIBS_FOLDER]=$LIBS_FOLDER
-  ENV_PARAMS[PROJECT_REPO]=$GITHUB_BASE_URL/$GITHUB_PROJECT_NAME
-  ENV_PARAMS[PROJECT_FOLDER]=$PROJECT_FOLDER
-  ENV_PARAMS[PROJECT_API]=$PROJECT_API
-  ENV_PARAMS[PROJECT_API_TAGS]=$PROJECT_API/tags
-  ENV_PARAMS[PROJECT_API_RELEASES]=$PROJECT_API/releases
-
+  declare -A ENV_PARAMS=(
+    [LIBS_FOLDER]=$LIBS_FOLDER
+    [GITHUB_PROJECT_NAME]=$GITHUB_PROJECT_NAME
+    [GITHUB_BASE_URL]=$GITHUB_BASE_URL
+    [GITHUB_API_URL]=$GITHUB_API_URL
+    [GITHUB_API_TOKEN]=$GITHUB_API_TOKEN
+    [PROJECT_FOLDER]=$PROJECT_FOLDER
+    [PROJECT_REPO]=$GITHUB_BASE_URL/$GITHUB_PROJECT_NAME
+    [PROJECT_API_URL]=$PROJECT_API_URL
+    [PROJECT_API_RELEASES]="$PROJECT_API_URL/releases"
+    [PROJECT_API_TAGS]="$PROJECT_API_URL/tags"
+  )
   init_env "$GITHUB_ENV_FILE" "$(declare -p ENV_PARAMS)"
 }
 
@@ -65,28 +59,21 @@ init() {
 # Returns ok if not API rate limit exceeded.
 check_api_rate() {
   load_env
-  if [ -n "$1" ]; then GITHUB_API_TOKEN=$1; fi
-  GITHUB_RATE_URL="https://api.github.com/rate_limit"
+  GITHUB_API_TOKEN=$1
+  GITHUB_RATE_URL="$GITHUB_API_URL/rate_limit"
+  GITLAB_HEADERS="-H \"Accept: application/vnd.github+json\" -H \"X-GitHub-Api-Version: 2022-11-28\""
   if [ -z "$GITHUB_API_TOKEN" ]; then
-    GITHUB_RATE=$(curl -sL \
-          -H "Accept: application/vnd.github+json" \
-          -H "X-GitHub-Api-Version: 2022-11-28" \
-          $GITHUB_RATE_URL | jq '.rate')
-  else
-    GITHUB_RATE=$(curl -sL \
-      -H "Accept: application/vnd.github+json" \
-      -H "Authorization: Bearer $GITHUB_API_TOKEN" \
-      -H "X-GitHub-Api-Version: 2022-11-28" \
-      $GITHUB_RATE_URL | jq '.rate')
+    GITLAB_HEADERS="$GITLAB_HEADERS -H \"Authorization: Bearer $GITHUB_API_TOKEN\""
   fi
 
+  GITHUB_RATE=$(curl -sL "$GITLAB_HEADERS" $GITHUB_RATE_URL | jq '.rate')
   GITHUB_RATE_LIMIT=$(echo "$GITHUB_RATE"|jq '.limit')
   GITHUB_RATE_USED=$(echo "$GITHUB_RATE"|jq '.used')
 
   if [ "$GITHUB_RATE_USED" -lt "$GITHUB_RATE_LIMIT" ]; then
     show_message "ok"
   else
-    show_message "API rate limit exceeded" 1
+    show_message "API rate limit exceeded" 1; exit $?;
   fi
 }
 
@@ -95,7 +82,7 @@ check_api_rate() {
 # Returns the latest release name.
 release_latest() {
   load_env
-  release_latest=$(curl -s "$PROJECT_API_RELEASES/latest"|jq -r .tag_name)
+  release_latest=$(curl -s "$PROJECT_API_RELEASES/latest"|jq -r '.tag_name')
   echo "$release_latest"
 }
 
@@ -107,7 +94,7 @@ release_latest() {
 release_verify() {
   load_env
   release_name=$1
-  if [ -z "$release_name" ]; then show_message "Please provide a release name" 1; fi
+  if [ -z "$release_name" ]; then show_message "Please provide a release name" 1; exit $?; fi
   release=$(curl -s "$PROJECT_API_TAGS"|jq -r ".[]|select( .name == \"$release_name\" ).name")
   echo "$release"
 }
@@ -126,7 +113,7 @@ release_choice() {
     fi
     release=$(release_verify "$release_response")
     if [ -z "$release" ]; then
-      show_message "Not a valid version" 1
+      show_message "Not a valid version" 1;
       if [ -n "$test_answer" ]; then exit 1; fi
     fi
   done
@@ -153,7 +140,7 @@ clone() {
   if [ -z "$release" ]; then release=$(release_latest); fi
   # Check release
   release_verify=$(release_verify "$release")
-  if [ -z "$release_verify" ]; then show_message "$release is not a valid version!" 1; fi
+  if [ -z "$release_verify" ]; then show_message "$release is not a valid version!" 1; exit $?; fi
   # User confirmation before
   if [ "$confirm_clone" -eq 1 ]; then
     clone_latest=$(show_confirm_message "Clone the $release version of $GITHUB_PROJECT_NAME? [Y/n] " "y")

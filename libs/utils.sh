@@ -6,12 +6,8 @@ LIB_MESSAGES="$CURRENT_DIR/messages.sh"
 show_message() { bash "$LIB_MESSAGES" "${FUNCNAME[0]}" "$@"; }
 
 function init_env() {
-  ENV_FILE=$1
-  ENV_PARAMS=${2#*=}
-  eval "declare -A ENV_PARAMS=$ENV_PARAMS"
-
-  if [ -z "$ENV_FILE" ]; then show_message "Please provide the env file" 1; fi
-
+  ENV_FILE=$1 && [[ -z "$ENV_FILE" ]] && { show_message "Please provide the env file" 1; exit $?; }
+  ENV_PARAMS=${2#*=} && eval "declare -A ENV_PARAMS=$ENV_PARAMS"
   # Initializing the environment file
   cp /dev/null "$ENV_FILE"
   for ENV_PARAM in "${!ENV_PARAMS[@]}"; do
