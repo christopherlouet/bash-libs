@@ -7,3 +7,4 @@ tests/.pytest_cache/
 **/__pycache__
 
 libs/.*
+tests/.env

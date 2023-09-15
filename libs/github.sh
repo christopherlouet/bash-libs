@@ -3,12 +3,12 @@
 CURRENT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 GITHUB_ENV_FILE="$CURRENT_DIR/.github"
 LIB_MESSAGES="$CURRENT_DIR/messages.sh"
+LIB_UTILS="$CURRENT_DIR/utils.sh"
 
 show_message() { bash "$LIB_MESSAGES" "${FUNCNAME[0]}" "$@"; }
 show_confirm_message() { bash "$LIB_MESSAGES" "${FUNCNAME[0]}" "$@"; }
-
-_load_params() {
-  if [ ! -f "$GITHUB_ENV_FILE" ]; then show_message "Environment file does not exist! ($GITHUB_ENV_FILE)" 1; fi
+init_env() { bash "$LIB_UTILS" "${FUNCNAME[0]}" "$@"; }
+load_env() {
   # shellcheck source=libs/.github
   source "$GITHUB_ENV_FILE"
 }
@@ -17,6 +17,7 @@ _load_params() {
 #
 # $1 - Project name in github.
 # $2 - An optional project folder.
+# $3 - An optional api token
 #
 # Examples:
 # ./libs/github.sh "project/repository"                                   # Initialize the project in the parent folder
@@ -25,42 +26,75 @@ _load_params() {
 # Returns nothing.
 init() {
   GITHUB_PROJECT_NAME=$1
-  # Check arguments
+  # Project name
   if [ -z "$GITHUB_PROJECT_NAME" ]; then show_message "Please provide the project path" 1; fi
+  # Project folder
   if [ -z "$2" ]; then
     PROJECT_FOLDER=$CURRENT_DIR/../$(echo "$GITHUB_PROJECT_NAME"|rev|cut -d"/" -f1|rev)
   else
     PROJECT_FOLDER=$2
   fi
+  # Api token
+  GITHUB_API_TOKEN=$3
+
   # Initializing environment variables
   GITHUB_BASE_URL=https://github.com
   GITHUB_API_URL=https://api.github.com/repos
   LIBS_FOLDER=$CURRENT_DIR
   PROJECT_API=$GITHUB_API_URL/$GITHUB_PROJECT_NAME
-  PROJECT_API_TAGS=$PROJECT_API/tags
-  PROJECT_API_RELEASES=$PROJECT_API/releases
-  PROJECT_REPO=$GITHUB_BASE_URL/$GITHUB_PROJECT_NAME
 
-  # Initializing the environment file
-  cp /dev/null "$GITHUB_ENV_FILE"
-  {
-    echo "GITHUB_PROJECT_NAME=$GITHUB_PROJECT_NAME"
-    echo "GITHUB_BASE_URL=$GITHUB_BASE_URL"
-    echo "GITHUB_API_URL=$GITHUB_API_URL"
-    echo "LIBS_FOLDER=$LIBS_FOLDER"
-    echo "PROJECT_REPO=$PROJECT_REPO"
-    echo "PROJECT_FOLDER=$PROJECT_FOLDER"
-    echo "PROJECT_API=$PROJECT_API"
-    echo "PROJECT_API_TAGS=$PROJECT_API_TAGS"
-    echo "PROJECT_API_RELEASES=$PROJECT_API_RELEASES"
-  } >> "$GITHUB_ENV_FILE"
+  declare -A ENV_PARAMS
+  ENV_PARAMS[GITHUB_PROJECT_NAME]=$GITHUB_PROJECT_NAME
+  ENV_PARAMS[GITHUB_BASE_URL]=$GITHUB_BASE_URL
+  ENV_PARAMS[GITHUB_API_URL]=$GITHUB_API_URL
+  ENV_PARAMS[GITHUB_API_TOKEN]=$GITHUB_API_TOKEN
+  ENV_PARAMS[LIBS_FOLDER]=$LIBS_FOLDER
+  ENV_PARAMS[PROJECT_REPO]=$GITHUB_BASE_URL/$GITHUB_PROJECT_NAME
+  ENV_PARAMS[PROJECT_FOLDER]=$PROJECT_FOLDER
+  ENV_PARAMS[PROJECT_API]=$PROJECT_API
+  ENV_PARAMS[PROJECT_API_TAGS]=$PROJECT_API/tags
+  ENV_PARAMS[PROJECT_API_RELEASES]=$PROJECT_API/releases
+
+  init_env "$GITHUB_ENV_FILE" "$(declare -p ENV_PARAMS)"
+}
+
+# Check API rate limit.
+#
+# $1 - An optional API token.
+#
+# Returns ok if not API rate limit exceeded.
+check_api_rate() {
+  load_env
+  if [ -n "$1" ]; then GITHUB_API_TOKEN=$1; fi
+  GITHUB_RATE_URL="https://api.github.com/rate_limit"
+  if [ -z "$GITHUB_API_TOKEN" ]; then
+    GITHUB_RATE=$(curl -sL \
+          -H "Accept: application/vnd.github+json" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          $GITHUB_RATE_URL | jq '.rate')
+  else
+    GITHUB_RATE=$(curl -sL \
+      -H "Accept: application/vnd.github+json" \
+      -H "Authorization: Bearer $GITHUB_API_TOKEN" \
+      -H "X-GitHub-Api-Version: 2022-11-28" \
+      $GITHUB_RATE_URL | jq '.rate')
+  fi
+
+  GITHUB_RATE_LIMIT=$(echo "$GITHUB_RATE"|jq '.limit')
+  GITHUB_RATE_USED=$(echo "$GITHUB_RATE"|jq '.used')
+
+  if [ "$GITHUB_RATE_USED" -lt "$GITHUB_RATE_LIMIT" ]; then
+    show_message "ok"
+  else
+    show_message "API rate limit exceeded" 1
+  fi
 }
 
 # Name of last known release.
 #
 # Returns the latest release name.
 release_latest() {
-  _load_params
+  load_env
   release_latest=$(curl -s "$PROJECT_API_RELEASES/latest"|jq -r .tag_name)
   echo "$release_latest"
 }
@@ -71,10 +105,10 @@ release_latest() {
 #
 # Returns the release name if it exists, otherwise returns empty.
 release_verify() {
-  _load_params
+  load_env
   release_name=$1
   if [ -z "$release_name" ]; then show_message "Please provide a release name" 1; fi
-  release=$(curl  -s "$PROJECT_API_TAGS"|jq -r ".[]|select( .name == \"$release_name\" ).name")
+  release=$(curl -s "$PROJECT_API_TAGS"|jq -r ".[]|select( .name == \"$release_name\" ).name")
   echo "$release"
 }
 
@@ -91,7 +125,10 @@ release_choice() {
       if [ "$test_answer" = "no_answer" ]; then release_response=""; else release_response=$test_answer; fi
     fi
     release=$(release_verify "$release_response")
-    if [ -z "$release" ]; then show_message "'$release' is not a valid version!" 1; fi
+    if [ -z "$release" ]; then
+      show_message "Not a valid version" 1
+      if [ -n "$test_answer" ]; then exit 1; fi
+    fi
   done
   echo "$release"
 }
@@ -108,7 +145,7 @@ release_choice() {
 #
 # Returns nothing.
 clone() {
-  _load_params
+  load_env
   release=$1
   # Check user confirmation variable before
   if [ -z "$2" ]; then confirm_clone=1; else confirm_clone="$2"; fi

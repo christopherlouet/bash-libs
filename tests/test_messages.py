@@ -75,9 +75,9 @@ def test_confirm_message_answer_y_not_empty(bash):
 
 def test_confirm_message_answer_n(bash):
     assert bash.run_script(script, [
-        'confirm_message', 'confirm_message_answer_y_not_empty', '', 'n']) == ''
+        'confirm_message', 'confirm_message_answer_n', '', 'n']) == ''
 
 
 def test_confirm_message_answer_not_empty(bash):
     assert bash.run_script(script, [
-        'confirm_message', 'confirm_message_answer_y_not_empty', 'not_empty', 'n']) == ''
+        'confirm_message', 'confirm_message_answer_not_empty', 'not_empty', 'n']) == ''
