@@ -8,7 +8,7 @@ GITHUB_BASE_URL=https://github.com
 GITHUB_API_URL=https://api.github.com
 
 show_message() { bash "$LIB_MESSAGES" "${FUNCNAME[0]}" "$@"; }
-show_confirm_message() { bash "$LIB_MESSAGES" "${FUNCNAME[0]}" "$@"; }
+confirm_message() { bash "$LIB_MESSAGES" "${FUNCNAME[0]}" "$@"; }
 init_env() { bash "$LIB_UTILS" "${FUNCNAME[0]}" "$@"; }
 load_env() {
   # shellcheck source=libs/.github
@@ -122,8 +122,27 @@ release_choice() {
 
 # Clone a github project.
 #
+# $1 - The repository to clone from.
+# $2 - The release name.
+# $3 - The name of a new directory to clone into.
+#
+# Returns nothing.
+clone() {
+  repository=$1
+  release=$2
+  directory_target=$3
+  if [ -d "$directory_target" ]; then
+    show_message "Remove the $directory_target directory"
+    rm -rf "$directory_target"
+  fi
+  show_message "Clone the github repository $repository ($release)"
+  git clone --depth 1 --branch "$release" "$repository" "$directory_target" >&- 2>&-
+}
+
+# Clone a github project.
+#
 # $1 - The release name.
-# $2 - An optional user confirmation (0: no, 1: yes, default: yes)
+# $2 - An optional user confirmation (0: no, 1: yes, default: 1)
 #
 # Examples:
 # ./libs/github.sh clone        # Clone the latest release with a user confirmation
@@ -131,26 +150,24 @@ release_choice() {
 # ./libs/github.sh clone 1.0.0  # Clone the 1.0.0 release with a user confirmation
 #
 # Returns nothing.
-clone() {
+clone_verify() {
   load_env
   release=$1
   # Check user confirmation variable before
-  if [ -z "$2" ]; then confirm_clone=1; else confirm_clone="$2"; fi
+  confirm_clone=${2:-1}
   # Retrieve latest release if not specified
-  if [ -z "$release" ]; then release=$(release_latest); fi
+  release=${release:-$(release_latest)}
   # Check release
-  release_verify=$(release_verify "$release")
-  if [ -z "$release_verify" ]; then show_message "$release is not a valid version!" 1; exit $?; fi
+  release_verify=$(release_verify "$release") && [[ -z "$release_verify" ]] &&
+    { show_message "$release is not a valid version!" 1; exit $?; }
   # User confirmation before
   if [ "$confirm_clone" -eq 1 ]; then
-    clone_latest=$(show_confirm_message "Clone the $release version of $GITHUB_PROJECT_NAME? [Y/n] " "y")
-    if [ "$clone_latest" != "y" ]; then exit 0; fi
+    clone_latest=$(confirm_message "Clone the $release version of $GITHUB_PROJECT_NAME? [Y/n] " "y")
+    [[ "$clone_latest" != "y" ]] && exit 0
   fi
-  show_message "Clone the $GITHUB_PROJECT_NAME project ($release)"
-  show_message "rm -rf $PROJECT_FOLDER" -1 && \
-    rm -rf "$PROJECT_FOLDER"
-  show_message "git clone --depth 1 --branch $release $PROJECT_REPO $PROJECT_FOLDER" -1 && \
-    git clone --depth 1 --branch "$release" "$PROJECT_REPO" "$PROJECT_FOLDER"
+  # Clone the project
+  # shellcheck disable=SC2153
+  clone "$PROJECT_REPO" "$release" "$PROJECT_FOLDER"
 }
 
 "$@"
