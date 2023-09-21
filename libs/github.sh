@@ -1,19 +1,23 @@
 #!/usr/bin/env bash
 
 LIBS_FOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-GITHUB_ENV_FILE="$LIBS_FOLDER/.github"
-LIB_MESSAGES="$LIBS_FOLDER/messages.sh"
-LIB_UTILS="$LIBS_FOLDER/utils.sh"
+LIBS_MESSAGES="$LIBS_FOLDER/messages.sh"
+LIBS_UTILS="$LIBS_FOLDER/utils.sh"
+SCRIPT_NAME="$(basename -- "${BASH_SOURCE[0]}")"
+ENV_FILE="$LIBS_FOLDER/.${SCRIPT_NAME%.*}"
 GITHUB_BASE_URL=https://github.com
 GITHUB_API_URL=https://api.github.com
 
-show_message() { bash "$LIB_MESSAGES" "${FUNCNAME[0]}" "$@"; }
-confirm_message() { bash "$LIB_MESSAGES" "${FUNCNAME[0]}" "$@"; }
-init_env() { bash "$LIB_UTILS" "${FUNCNAME[0]}" "$@"; }
+check_function_params() { bash "$LIBS_UTILS" "${FUNCNAME[0]}" "$@"; }
+init_env() { bash "$LIBS_UTILS" "${FUNCNAME[0]}" "$@"; }
 load_env() {
   # shellcheck source=libs/.github
-  source "$GITHUB_ENV_FILE"
+  source "$ENV_FILE"
 }
+
+# Message functions
+show_message() { bash "$LIBS_MESSAGES" "${FUNCNAME[0]}" "$@"; }
+confirm_message() { bash "$LIBS_MESSAGES" "${FUNCNAME[0]}" "$@"; }
 
 # Initialize environment variables for a github project. You can customize the project folder by specifying a path.
 #
@@ -49,7 +53,7 @@ init() {
     [PROJECT_API_RELEASES]="$PROJECT_API_URL/releases"
     [PROJECT_API_TAGS]="$PROJECT_API_URL/tags"
   )
-  init_env "$GITHUB_ENV_FILE" "$(declare -p ENV_PARAMS)"
+  init_env "$ENV_FILE" "$(declare -p ENV_PARAMS)"
 }
 
 # Check API rate limit.
@@ -57,7 +61,7 @@ init() {
 # $1 - An optional API token.
 #
 # Returns ok if not API rate limit exceeded.
-check_api_rate() {
+_check_api_rate() {
   load_env
   GITHUB_API_TOKEN=$1
   GITHUB_RATE_URL="$GITHUB_API_URL/rate_limit"
@@ -80,7 +84,7 @@ check_api_rate() {
 # Name of last known release.
 #
 # Returns the latest release name.
-release_latest() {
+_release_latest() {
   load_env
   release_latest=$(curl -s "$PROJECT_API_RELEASES/latest"|jq -r '.tag_name')
   echo "$release_latest"
@@ -91,7 +95,7 @@ release_latest() {
 # $1 - The release name.
 #
 # Returns the release name if it exists, otherwise returns empty.
-release_verify() {
+_release_verify() {
   load_env
   release_name=$1
   if [ -z "$release_name" ]; then show_message "Please provide a release name" 1; exit $?; fi
@@ -150,8 +154,7 @@ clone() {
 # ./libs/github.sh clone 1.0.0  # Clone the 1.0.0 release with a user confirmation
 #
 # Returns nothing.
-clone_verify() {
-  load_env
+_clone_verify() {
   release=$1
   # Check user confirmation variable before
   confirm_clone=${2:-1}
@@ -170,4 +173,8 @@ clone_verify() {
   clone "$PROJECT_REPO" "$release" "$PROJECT_FOLDER"
 }
 
-"$@"
+test() {
+  echo "test"
+}
+
+check_function_params "$@" && "$@"

@@ -15,23 +15,16 @@ declare -A MSG_COLORS=(
 # Returns the formatted message.
 show_message() {
   msg=$1
-  level=$2
-  msg_end=${MSG_COLORS[NOCOLOR]}
+  level=${2:-0}
   # Check level option
-  if [ -z "$level" ]; then
-    level=0
-  else
-    re='^-?[0-9]+$'
-    if ! [[ $level =~ $re ]] ; then show_message "Invalid level option" 1; fi
-  fi
+  if ! [[ $level =~ ^-?[0-9]+$ ]] ; then { show_message "Invalid level option" 1; exit 1; } fi
   # level=0: info message
-  if [ $level -eq 0 ]; then msg_start="${MSG_COLORS[GREEN]}"; fi
+  if [ "$level" -eq 0 ]; then msg_start="${MSG_COLORS[GREEN]}"; fi
   # level>0: error message
-  if [ $level -gt 0 ]; then msg_start="${MSG_COLORS[RED]}"; fi
+  if [ "$level" -gt 0 ]; then msg_start="${MSG_COLORS[RED]}"; fi
   # level<0: warn message
-  if [ $level -lt 0 ]; then msg_start="${MSG_COLORS[ORANGE]}"; fi
-  echo -e "$msg_start$msg$msg_end"
-  if [ $level -gt 0 ]; then exit $level; fi
+  if [ "$level" -lt 0 ]; then msg_start="${MSG_COLORS[ORANGE]}"; fi
+  echo -e "$msg_start$msg${MSG_COLORS[NOCOLOR]}"
 }
 
 # Read a confirm message and print a response ('y','') to STDOUT.
