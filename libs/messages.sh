@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 
-NOCOLOR='\033[0m'
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-ORANGE='\033[0;33m'
+declare -A MSG_COLORS=(
+  [NOCOLOR]='\033[0m'
+  [GREEN]='\033[0;32m'
+  [RED]='\033[0;31m'
+  [ORANGE]='\033[0;33m'
+)
 
 # Print a message to STDOUT. You can customize the output by specifying a level.
 #
@@ -13,31 +15,16 @@ ORANGE='\033[0;33m'
 # Returns the formatted message.
 show_message() {
   msg=$1
-  level=$2
-  msg_end="$NOCOLOR"
+  level=${2:-0}
   # Check level option
-  if [ -z "$level" ]; then
-    level=0
-  else
-    re='^-?[0-9]+$'
-    if ! [[ $level =~ $re ]] ; then
-      show_message "Invalid level option" 1
-    fi
-  fi
+  if ! [[ $level =~ ^-?[0-9]+$ ]] ; then { show_message "Invalid level option" 1 && return 1; } fi
   # level=0: info message
-  if [ $level -eq 0 ]; then
-    msg_start="$GREEN"
-  fi
+  if [ "$level" -eq 0 ]; then msg_start="${MSG_COLORS[GREEN]}"; fi
   # level>0: error message
-  if [ $level -gt 0 ]; then
-    msg_start="$RED"
-  fi
+  if [ "$level" -gt 0 ]; then msg_start="${MSG_COLORS[RED]}"; fi
   # level<0: warn message
-  if [ $level -lt 0 ]; then
-    msg_start="$ORANGE"
-  fi
-  echo -e "$msg_start$msg$msg_end"
-  if [ $level -gt 0 ]; then exit $level; fi
+  if [ "$level" -lt 0 ]; then msg_start="${MSG_COLORS[ORANGE]}"; fi
+  echo -e "$msg_start$msg${MSG_COLORS[NOCOLOR]}"
 }
 
 # Read a confirm message and print a response ('y','') to STDOUT.
@@ -47,13 +34,13 @@ show_message() {
 # $3 - Expected answer, used for unit test.
 #
 # Returns "y" if the user's response is "yes" or "y".
-show_confirm_message() {
+confirm_message() {
   default_answer=$2
   test_answer=$3
   if [ -z "$test_answer" ]; then
     read -r -p "$1" answer
   else
-    answer=$test_answer
+    if [ "$test_answer" = "no_answer" ]; then answer=""; else answer=$test_answer; fi
   fi
   if [ -z "$answer" ]; then
     echo "$default_answer" && exit

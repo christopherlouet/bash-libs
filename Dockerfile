@@ -25,7 +25,7 @@ LABEL maintainer="Christopher LOUËT"
 ENV VIRTUAL_ENV=/app/.venv \
     PATH="/app/.venv/bin:$PATH"
 
-RUN apk add --update --no-cache bash \
+RUN apk add --update --no-cache bash curl jq \
     && rm -rf /var/cache/apk/*
 RUN addgroup -g 1000 app \
     && adduser -G app -u 1000 app -D
