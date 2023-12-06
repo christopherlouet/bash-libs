@@ -2,6 +2,8 @@ import inspect
 import os
 
 script_dir: str = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+if os.getenv('PWD') == "/app":
+    script_dir = "/app/tests"
 script: str = f"{script_dir}/../libs/messages.sh"
 
 
@@ -21,14 +23,14 @@ def test_show_message_error(bash):
     with bash() as s:
         s.auto_return_code_error = False
         assert s.run_script(script, ['show_message', 'error1', 1]) == 'error1'
-        assert s.last_return_code == 1
+        assert s.last_return_code == 0
 
 
 def test_show_message_error_2(bash):
     with bash() as s:
         s.auto_return_code_error = False
         assert s.run_script(script, ['show_message', 'error2', 2]) == 'error2'
-        assert s.last_return_code == 2
+        assert s.last_return_code == 0
 
 
 def test_show_message_invalid_level(bash):

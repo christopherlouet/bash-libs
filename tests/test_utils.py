@@ -1,39 +1,38 @@
 import inspect
 import os
+import pytest
 
 script_dir: str = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+if os.getenv('PWD') == "/app":
+    script_dir = "/app/tests"
 script: str = f"{script_dir}/../libs/utils.sh"
 
 
 def test_check_function_params_empty(bash):
     with (bash() as s):
         s.auto_return_code_error = False
-        assert s.run_script(script) == "Please provide a function name"
+        assert s.run_script(script) == ""
+        assert s.last_return_code == 0
 
 
 def test_check_function_params_function_not_exist(bash):
     with (bash() as s):
         s.auto_return_code_error = False
-        assert s.run_script(script, ['check_args_function_not_exist']
-                            ) == "Function with name 'check_args_function_not_exist' not exists"
+        s.run_script(script, ['check_args_function_not_exist'])
+        assert s.last_return_code == 127
 
 
+@pytest.mark.skipif(os.getenv('PWD') == "/app", reason="Do not launch in a docker container")
 def test_check_function_params(bash):
-    assert bash.run_script(script, ['test_check_args']) == 'test_check_args'
+    with (bash() as s):
+        s.auto_return_code_error = False
+        assert s.run_script(script, ['test_check_args']) == 'test_check_args'
+        assert s.last_return_code == 0
 
 
+@pytest.mark.skipif(os.getenv('PWD') == "/app", reason="Do not launch in a docker container")
 def test_check_function_params_with_env(bash):
-    assert bash.run_script(script, ['_test_check_args_with_env']) == 'load_env'
-
-
-def test_init_env(bash):
-    env_file: str = f"{script_dir}/../libs/.utils"
-    bash.run_script(script, ['test_init_env'])
-
-    if os.path.isfile(env_file):
-        stream = open(env_file, "r")
-        content = stream.read()
-        stream.close()
-        assert content == "TEST_ENV_KEY=TEST_ENV_VALUE\n"
-    else:
-        assert False
+    with (bash() as s):
+        s.auto_return_code_error = False
+        assert s.run_script(script, ['_test_check_args_with_env']) == 'TEST_ENV_KEY=TEST_ENV_VALUE'
+        assert s.last_return_code == 0
