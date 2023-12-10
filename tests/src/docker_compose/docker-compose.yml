@@ -1,0 +1,19 @@
+---
+version: '3.8'
+services:
+  dc_test1:
+    image: "alpine:3.19.0"
+    profiles:
+      - profile_test1
+      - profile_test2
+    tty: true
+  dc_test2:
+    image: "alpine:3.19.0"
+    profiles:
+      - profile_test1
+    tty: true
+  dc_test3:
+    image: "alpine:3.19.0"
+    profiles:
+      - profile_test2
+    tty: true

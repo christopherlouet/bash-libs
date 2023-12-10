@@ -12,13 +12,12 @@ GITHUB_API_RATE_URL="$GITHUB_API_URL/rate_limit"
 
 main() { eval "$(bash "$LIBS_UTILS" "check_args" "$@") ; check_args $*" ; "$@"; }
 init_env() { bash "$LIBS_UTILS" "${FUNCNAME[0]}" "$@"; }
-check_var_is_defined() { bash "$LIBS_UTILS" "${FUNCNAME[0]}" "$@"; }
 
 function load_env() {
   if [ ! -f "$ENV_FILE" ]; then
-    show_message "Please initialize the environment file with the command '$SCRIPT_NAME init project_path'" 1; return 1;
+    show_message "Please initialize the environment file with the command '$SCRIPT_NAME init project_path'" 1; exit 1;
   fi
-  # shellcheck source=./github.sh
+  # shellcheck source=./github.env
   source "$ENV_FILE"
 }
 
@@ -26,39 +25,36 @@ function load_env() {
 show_message() { bash "$LIBS_MESSAGES" "${FUNCNAME[0]}" "$@"; }
 confirm_message() { bash "$LIBS_MESSAGES" "${FUNCNAME[0]}" "$@"; }
 
-# Initialize environment variables for a github project. You can customize the project folder by specifying a path.
+# Initialize environment variables for a github project.
 #
 # $1 - Project name in github.
 # $2 - A project folder (optional).
 # $3 - An API token (optional).
 #
 # Examples:
-# ./libs/github.sh "project/repository"                                   # Initialize the project in the parent folder
-# ./libs/github.sh "project/repository" "$HOME/sources/myrepository"      # Initialize the project with this path
+# ./libs/github.sh init "project/repository"                               # Initialize the project in the parent folder
+# ./libs/github.sh init "project/repository" "$HOME/sources/myrepository"  # Initialize the project with this path
 #
 # Returns nothing.
 init() {
   # Project name
-  GITHUB_PROJECT_NAME=$1 && [[ -z "$GITHUB_PROJECT_NAME" ]] &&
-    { show_message "Please provide the project path" 1 && return 1; }
+  GITHUB_PROJECT_NAME=$1
   # Project folder
-  PROJECT_FOLDER=${2:-$LIBS_FOLDER/../$(echo "$GITHUB_PROJECT_NAME"|rev|cut -d"/" -f1|rev)}
+  GITHUB_PROJECT_FOLDER=${2:-$LIBS_FOLDER/../$(echo "$GITHUB_PROJECT_NAME"|rev|cut -d"/" -f1|rev)}
   # Api token
   GITHUB_API_TOKEN=$3
+  [[ -z "$GITHUB_PROJECT_NAME" ]] && show_message "Please provide the project path" 1 && return 1
+  # Project repo url
+  GITHUB_PROJECT_REPO="$GITHUB_BASE_URL/$GITHUB_PROJECT_NAME"
   # Project API url
-  PROJECT_API_URL="$GITHUB_API_REPOS_URL/$GITHUB_PROJECT_NAME"
+  GITHUB_PROJECT_API_URL="$GITHUB_API_REPOS_URL/$GITHUB_PROJECT_NAME"
   # Initializing environment variables
   declare -A ENV_PARAMS=(
-    [LIBS_FOLDER]=$LIBS_FOLDER
     [GITHUB_PROJECT_NAME]=$GITHUB_PROJECT_NAME
-    [GITHUB_BASE_URL]=$GITHUB_BASE_URL
-    [GITHUB_API_URL]=$GITHUB_API_URL
+    [GITHUB_PROJECT_FOLDER]=$GITHUB_PROJECT_FOLDER
     [GITHUB_API_TOKEN]=$GITHUB_API_TOKEN
-    [PROJECT_FOLDER]=$PROJECT_FOLDER
-    [PROJECT_REPO]=$GITHUB_BASE_URL/$GITHUB_PROJECT_NAME
-    [PROJECT_API_URL]=$PROJECT_API_URL
-    [PROJECT_API_RELEASES]="$GITHUB_API_RELEASES_URL"
-    [PROJECT_API_TAGS]="$GITHUB_API_TAGS_URL"
+    [GITHUB_PROJECT_REPO]=$GITHUB_PROJECT_REPO
+    [GITHUB_PROJECT_API_URL]=$GITHUB_PROJECT_API_URL
   )
   init_env "$ENV_FILE" "$(declare -p ENV_PARAMS)"
 }
@@ -162,16 +158,15 @@ release_latest() {
   release_latest_show=${3:-1}
   [[ -z "$github_project_name" ]] && show_message "Please provide a github project name" 1 && return 1
   check_api_rate "$github_api_token" 0
-  release_latest_api_url="$GITHUB_API_REPOS_URL/$github_project_name/releases/latest"
   if [ -n "$github_api_token" ]; then
     response=$(curl -s -H 'Accept: application/vnd.github+json' \
       -H "X-GitHub-Api-Version: 2022-11-28" \
       -H "Authorization: Bearer $github_api_token" \
-      --compressed "$release_latest_api_url")
+      --compressed "$GITHUB_PROJECT_API_URL/releases/latest")
   else
     response=$(curl -s -H 'Accept: application/vnd.github+json' \
           -H "X-GitHub-Api-Version: 2022-11-28" \
-          --compressed "$release_latest_api_url")
+          --compressed "$GITHUB_PROJECT_API_URL/releases/latest")
   fi
   release_latest=$(echo $response|jq -r '.tag_name')
   [[ $release_latest_show -eq 1 ]] && show_message "$release_latest"
@@ -202,16 +197,16 @@ release_verify() {
   release_verify_show=${4:-1}
   [[ -z "$github_project_name" ]] && show_message "Please provide a github project name" 1 && return 1
   [[ -z "$release_name" ]] && show_message "Please provide a release name" 1 && return 1
-  project_tags_api_url="$GITHUB_API_REPOS_URL/$github_project_name/tags"
+  check_api_rate "$github_api_token" 0
   if [ -n "$github_api_token" ]; then
     response=$(curl -s -H 'Accept: application/vnd.github+json' \
       -H "X-GitHub-Api-Version: 2022-11-28" \
       -H "Authorization: Bearer $github_api_token" \
-      --compressed "$project_tags_api_url")
+      --compressed "$GITHUB_PROJECT_API_URL/tags")
   else
     response=$(curl -s -H 'Accept: application/vnd.github+json' \
           -H "X-GitHub-Api-Version: 2022-11-28" \
-          --compressed "$project_tags_api_url")
+          --compressed "$GITHUB_PROJECT_API_URL/tags")
   fi
   release_verify=$(echo $response|jq -r ".[]|select( .name == \"$release_name\" ).name")
   if [ -z $release_verify ]; then
@@ -291,7 +286,7 @@ clone() {
 #
 # Returns nothing.
 _clone() {
-  clone "$PROJECT_REPO" "$PROJECT_FOLDER" "$1" "$2"
+  clone "$GITHUB_PROJECT_REPO" "$GITHUB_PROJECT_FOLDER" "$1" "$2"
 }
 
 # Clone a github project.
