@@ -8,4 +8,5 @@ tests/.pytest_cache/
 
 libs/.*
 tests/.env
-tests/src
+tests/src/*
+!tests/src/docker_compose
