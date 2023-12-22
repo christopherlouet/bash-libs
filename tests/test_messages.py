@@ -4,7 +4,7 @@ import os
 script_dir: str = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 if os.getenv('PWD') == "/app":
     script_dir = "/app/tests"
-script: str = f"{script_dir}/../libs/messages.sh"
+script: str = os.path.abspath(f"{script_dir}/../libs/messages.sh")
 
 
 def test_show_message(bash):

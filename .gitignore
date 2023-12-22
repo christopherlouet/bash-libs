@@ -3,10 +3,10 @@
 *.retry
 
 .pytest_cache/
-tests/.pytest_cache/
 **/__pycache__
 
-libs/.*
-tests/.env
-tests/src/*
-!tests/src/docker_compose
+config/*
+!config/docker_compose
+!config/menu
+env/*
+tests/.*

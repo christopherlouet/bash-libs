@@ -1,0 +1,39 @@
+---
+name: test.sh
+help: |
+  toto
+opts:
+  test1:
+    opts:
+      test1:
+        prefix: true
+      test2:
+        prefix: false
+      test3:
+    help: "toto2"
+  test2:
+    opts:
+      test1:
+        optional: true
+    prefix: true
+  test3:
+    optional: false
+    opts:
+      test1:
+        prefix: true
+      test2:
+      test3:
+        optional: true
+  test4:
+  test5:
+    optional: true
+  test6:
+    optional: true
+    opts:
+      test1:
+        prefix: true
+      test2:
+        prefix: false
+      test3:
+      test4:
+        optional: true
