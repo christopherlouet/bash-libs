@@ -1,49 +1,50 @@
 #!/usr/bin/env bash
 
 LIBS_FOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+CONFIG_FOLDER=$( cd -- $LIBS_FOLDER/../config &> /dev/null && pwd )
+ENV_FOLDER=$( cd -- $LIBS_FOLDER/../env &> /dev/null && pwd )
 LIBS_MESSAGES="$LIBS_FOLDER/messages.sh"
 LIBS_UTILS="$LIBS_FOLDER/utils.sh"
 SCRIPT_NAME="$(basename -- "${BASH_SOURCE[0]}")"
-ENV_FILE="$LIBS_FOLDER/.${SCRIPT_NAME%.*}"
+ENV_FILE="$ENV_FOLDER/.${SCRIPT_NAME%.*}"
 GITHUB_BASE_URL="https://github.com"
 GITHUB_API_URL="https://api.github.com"
 GITHUB_API_REPOS_URL="$GITHUB_API_URL/repos"
 GITHUB_API_RATE_URL="$GITHUB_API_URL/rate_limit"
 
 main() { eval "$(bash "$LIBS_UTILS" "check_args" "$@") ; check_args $*" ; "$@"; }
+show_message() { bash "$LIBS_MESSAGES" "${FUNCNAME[0]}" "$@"; }
+confirm_message() { bash "$LIBS_MESSAGES" "${FUNCNAME[0]}" "$@"; }
+die() { bash "$LIBS_MESSAGES" "${FUNCNAME[0]}" "$@"; }
 init_env() { bash "$LIBS_UTILS" "${FUNCNAME[0]}" "$@"; }
 
 function load_env() {
   if [ ! -f "$ENV_FILE" ]; then
-    show_message "Please initialize the environment file with the command '$SCRIPT_NAME init project_path'" 1; exit 1;
+    die "Please initialize the environment file with the command '$SCRIPT_NAME init project_path'" ; exit 1;
   fi
   # shellcheck source=./github.env
   source "$ENV_FILE"
 }
 
-# Message functions
-show_message() { bash "$LIBS_MESSAGES" "${FUNCNAME[0]}" "$@"; }
-confirm_message() { bash "$LIBS_MESSAGES" "${FUNCNAME[0]}" "$@"; }
-
 # Initialize environment variables for a github project.
 #
 # $1 - Project name in github.
-# $2 - A project folder (optional).
+# $2 - A project folder (default config/project_name).
 # $3 - An API token (optional).
 #
 # Examples:
-# ./libs/github.sh init "project/repository"                               # Initialize the project in the parent folder
-# ./libs/github.sh init "project/repository" "$HOME/sources/myrepository"  # Initialize the project with this path
+# ./libs/github.sh init "project/repository"                               # Initialize the project
+# ./libs/github.sh init "project/repository" "config/myrepository"  # Initialize the project with this path
 #
 # Returns nothing.
 init() {
   # Project name
   GITHUB_PROJECT_NAME=$1
   # Project folder
-  GITHUB_PROJECT_FOLDER=${2:-$LIBS_FOLDER/../$(echo "$GITHUB_PROJECT_NAME"|rev|cut -d"/" -f1|rev)}
+  GITHUB_PROJECT_FOLDER=$CONFIG_FOLDER/${2:-$(echo "$GITHUB_PROJECT_NAME"|rev|cut -d"/" -f1|rev)}
   # Api token
   GITHUB_API_TOKEN=$3
-  [[ -z "$GITHUB_PROJECT_NAME" ]] && show_message "Please provide the project path" 1 && return 1
+  [[ -z "$GITHUB_PROJECT_NAME" ]] && die "Please provide the project path" && return 1
   # Project repo url
   GITHUB_PROJECT_REPO="$GITHUB_BASE_URL/$GITHUB_PROJECT_NAME"
   # Project API url
@@ -65,7 +66,7 @@ init() {
 # $2 - Display a message (optional).
 #
 # Returns current data rate.
-api_rate() {
+gh_api_rate() {
   github_api_token=$1
   api_rate_show=${2:-1}
   [[ $api_rate_show -eq 1 ]] && declare -A data_api_rate
@@ -104,8 +105,8 @@ api_rate() {
 # $1 - Display a message (optional).
 #
 # Returns current data rate.
-_api_rate() {
-  api_rate "$GITHUB_API_TOKEN" $1
+_gh_api_rate() {
+  gh_api_rate "$GITHUB_API_TOKEN" $1
 }
 
 # Check API rate limit.
@@ -114,24 +115,22 @@ _api_rate() {
 # $2 - Display a message (optional).
 #
 # Returns 1 if API rate limit exceeded.
-check_api_rate() {
+gh_check_api_rate() {
   github_api_token=$1
   check_api_rate_show=${2:-1}
-
   declare -A data_api_rate
-  api_rate $github_api_token 0
+  gh_api_rate $github_api_token 0
   if [ $? -eq 1 ]; then
-    [[ $check_api_rate_show -eq 1 ]] && show_message "Erreur api_rate" 1
+    [[ $check_api_rate_show -eq 1 ]] && die "Erreur api_rate"
     return 1
   fi
   rate_limit=${data_api_rate[LIMIT]}
   rate_used=${data_api_rate[USED]}
-
   if [ "$rate_used" -lt "$rate_limit" ]; then
     [[ $check_api_rate_show -eq 1 ]] && show_message "ok"
     return 0
   else
-    [[ $check_api_rate_show -eq 1 ]] && show_message "API rate limit exceeded" 1
+    [[ $check_api_rate_show -eq 1 ]] && die "API rate limit exceeded"
     return 1
   fi
 }
@@ -141,8 +140,8 @@ check_api_rate() {
 # $1 - Display a message (optional).
 #
 # Returns 1 if API rate limit exceeded.
-_check_api_rate() {
-  check_api_rate "$GITHUB_API_TOKEN" $1
+_gh_check_api_rate() {
+  gh_check_api_rate "$GITHUB_API_TOKEN" $1
 }
 
 # Get last known release name.
@@ -152,12 +151,12 @@ _check_api_rate() {
 # $3 - Display a message (optional).
 #
 # Returns the latest release name.
-release_latest() {
+gh_release_latest() {
   github_project_name=$1
   github_api_token=$2
   release_latest_show=${3:-1}
-  [[ -z "$github_project_name" ]] && show_message "Please provide a github project name" 1 && return 1
-  check_api_rate "$github_api_token" 0
+  [[ -z "$github_project_name" ]] && die "Please provide a github project name" && return 1
+  gh_check_api_rate "$github_api_token" 0
   if [ -n "$github_api_token" ]; then
     response=$(curl -s -H 'Accept: application/vnd.github+json' \
       -H "X-GitHub-Api-Version: 2022-11-28" \
@@ -178,8 +177,8 @@ release_latest() {
 # $1 - Display a message (optional).
 #
 # Returns the latest release name.
-_release_latest() {
-  release_latest "$GITHUB_PROJECT_NAME" "$GITHUB_API_TOKEN" "$1"
+_gh_release_latest() {
+  gh_release_latest "$GITHUB_PROJECT_NAME" "$GITHUB_API_TOKEN" "$1"
 }
 
 # Check if the release name exists.
@@ -190,14 +189,14 @@ _release_latest() {
 # $4 - Display a message (optional).
 #
 # Returns 1 if release name not exists.
-release_verify() {
+gh_release_verify() {
   github_project_name=$1
   release_name=$2
   github_api_token=$3
   release_verify_show=${4:-1}
-  [[ -z "$github_project_name" ]] && show_message "Please provide a github project name" 1 && return 1
-  [[ -z "$release_name" ]] && show_message "Please provide a release name" 1 && return 1
-  check_api_rate "$github_api_token" 0
+  [[ -z "$github_project_name" ]] && die "Please provide a github project name" && return 1
+  [[ -z "$release_name" ]] && die "Please provide a release name" && return 1
+  gh_check_api_rate "$github_api_token" 0
   if [ -n "$github_api_token" ]; then
     response=$(curl -s -H 'Accept: application/vnd.github+json' \
       -H "X-GitHub-Api-Version: 2022-11-28" \
@@ -224,14 +223,14 @@ release_verify() {
 # $2 - Display a message (optional).
 #
 # Returns 1 if release name not exists.
-_release_verify() {
-  release_verify "$GITHUB_PROJECT_NAME" "$1" "$GITHUB_API_TOKEN" "$2"
+_gh_release_verify() {
+  gh_release_verify "$GITHUB_PROJECT_NAME" "$1" "$GITHUB_API_TOKEN" "$2"
 }
 
 # Prompt the user for the name of the release to retrieve.
 #
 # Returns the release name.
-_release_choice() {
+_gh_release_choice() {
   test_answer=$1
   release=""
   while [ -z "$release" ]; do
@@ -240,7 +239,7 @@ _release_choice() {
     else
       if [ "$test_answer" = "no_answer" ]; then release_response=""; else release_response=$test_answer; fi
     fi
-    _release_verify "$release_response" 0
+    _gh_release_verify "$release_response" 0
     if [ $? -eq 1 ]; then
       show_message "Not a valid version" 1;
       if [ -n "$test_answer" ]; then return 1; fi
@@ -259,13 +258,13 @@ _release_choice() {
 # $4 - Display a message (optional).
 #
 # Returns nothing.
-clone() {
+gh_clone() {
   repository=$1
   directory_target=$2
   tag=$3
   clone_show=${4:-1}
-  [[ -z "$repository" ]] && show_message "Please provide a repository name" 1 && return 1
-  [[ -z "$directory_target" ]] && show_message "Please provide a directory target" 1 && return 1
+  [[ -z "$repository" ]] && die "Please provide a repository name" && return 1
+  [[ -z "$directory_target" ]] && die "Please provide a directory target" && return 1
   if [ -d "$directory_target" ]; then
     [[ $clone_show -eq 1 ]] && show_message "Remove the $directory_target directory"
     rm -rf "$directory_target"
@@ -285,8 +284,8 @@ clone() {
 # $2 - Display a message (optional).
 #
 # Returns nothing.
-_clone() {
-  clone "$GITHUB_PROJECT_REPO" "$GITHUB_PROJECT_FOLDER" "$1" "$2"
+_gh_clone() {
+  gh_clone "$GITHUB_PROJECT_REPO" "$GITHUB_PROJECT_FOLDER" "$1" "$2"
 }
 
 # Clone a github project.
@@ -300,16 +299,16 @@ _clone() {
 # ./libs/github.sh _clone_with_prompt 1.0.0  # Clone the 1.0.0 release with a user confirmation
 #
 # Returns nothing.
-_clone_with_prompt() {
+_gh_clone_with_prompt() {
   tag=$1
   # Check user confirmation variable before
   confirm_clone=${2:-1}
   # Retrieve latest release if not specified
-  _release_latest 0
+  _gh_release_latest 0
   tag=${tag:-$release_latest}
   # Check release
-  _release_verify "$tag" 0
-  [[ $? -eq 1 ]] && { show_message "$tag is not a valid tag or branch!" 1 && return 1; }
+  _gh_release_verify "$tag" 0
+  [[ $? -eq 1 ]] && { die "$tag is not a valid tag or branch!" && return 1; }
   # User confirmation before
   if [ "$confirm_clone" -eq 1 ]; then
     clone_latest=$(confirm_message "Clone the $tag branch of $GITHUB_PROJECT_NAME? [Y/n] " "y")

@@ -25,8 +25,15 @@ LABEL maintainer="Christopher LOUËT"
 ENV VIRTUAL_ENV=/app/.venv \
     PATH="/app/.venv/bin:$PATH"
 
-RUN apk add --update --no-cache bash curl jq \
+# Install packages
+RUN apk add --update --no-cache bash curl jq wget docker docker-compose openrc \
     && rm -rf /var/cache/apk/*
+
+# Install yq
+RUN wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq \
+    -q --show-progress > /dev/null && chmod +x /usr/bin/yq
+
+# Create user
 RUN addgroup -g 1000 app \
     && adduser -G app -u 1000 app -D
 

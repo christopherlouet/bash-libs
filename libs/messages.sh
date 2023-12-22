@@ -17,7 +17,7 @@ show_message() {
   msg=$1
   level=${2:-0}
   # Check level option
-  if ! [[ $level =~ ^-?[0-9]+$ ]] ; then { show_message "Invalid level option" 1 && return 1; } fi
+  if ! [[ $level =~ ^-?[0-9]+$ ]] ; then { die "Invalid level option" && return 1; } fi
   # level=0: info message
   if [ "$level" -eq 0 ]; then msg_start="${MSG_COLORS[GREEN]}"; fi
   # level>0: error message
@@ -25,6 +25,10 @@ show_message() {
   # level<0: warn message
   if [ "$level" -lt 0 ]; then msg_start="${MSG_COLORS[ORANGE]}"; fi
   echo -e "$msg_start$msg${MSG_COLORS[NOCOLOR]}"
+}
+
+die() {
+    echo -e "${MSG_COLORS[RED]}$*${MSG_COLORS[NOCOLOR]}" > /dev/stderr
 }
 
 # Read a confirm message and print a response ('y','') to STDOUT.

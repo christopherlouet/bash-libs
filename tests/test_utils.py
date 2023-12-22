@@ -5,7 +5,7 @@ import pytest
 script_dir: str = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 if os.getenv('PWD') == "/app":
     script_dir = "/app/tests"
-script: str = f"{script_dir}/../libs/utils.sh"
+script: str = os.path.abspath(f"{script_dir}/../libs/utils.sh")
 
 
 def test_check_function_params_empty(bash):
