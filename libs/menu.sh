@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# @file menu.sh
+# @brief A library for manage a help menu with an environment file.
+# @description
+#     The library allows you to display a help menu by retrieving the parameters from a yaml configuration file.
 
 LIBS_FOLDER=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 CONFIG_FOLDER=$( cd -- $LIBS_FOLDER/../config &> /dev/null && pwd )
@@ -16,6 +20,7 @@ die() { bash "$LIBS_MESSAGES" "${FUNCNAME[0]}" "$@"; }
 init_env() { bash "$LIBS_UTILS" "${FUNCNAME[0]}" "$@"; }
 yaml_parse() { bash "$LIBS_UTILS" "${FUNCNAME[0]}" "$@"; }
 
+# @description Load the environment variables with the .env file.
 function load_env() {
   if [ ! -f "$ENV_FILE" ]; then
     die "Please initialize the environment file with the command '$SCRIPT_NAME init project_name'" ; exit 1;
@@ -24,9 +29,7 @@ function load_env() {
   source "$ENV_FILE"
 }
 
-# Check if yq is installed, and install it if necessary
-#
-# Returns nothing.
+# @description Check if yq is installed, and install it if necessary.
 function check_env() {
   if ! command -v yq 2> /dev/null > /dev/null ; then
       jq_install=$(confirm_message "yq not available, do you want to install the latest version? [Y/n] " "y")
@@ -45,16 +48,14 @@ function check_env() {
   fi
 }
 
-# Initialize environment variables for a menu project.
+# @description Initialize environment variables for a menu project.
 #
-# $1 - Project name. (Default menu).
-# $2 - Project folder (Default config/menu).
-# $3 - Configuration file (Default menu.yml).
+# @arg $1 string Project name. (default **menu**).
+# @arg $2 string Project folder (default **config/menu**).
+# @arg $3 string Configuration file (default **menu.yml**).
 #
-# Examples:
+# @example
 # ./libs/menu.sh init "project_name"  # Initialize the project
-#
-# Returns nothing.
 init() {
   # Project name
   MENU_PROJECT_NAME=${1:-menu}
@@ -68,16 +69,13 @@ init() {
     [MENU_FOLDER]=$MENU_FOLDER
     [MENU_FILE]=$MENU_FILE
   )
-  echo $ENV_FILE
   init_env "$ENV_FILE" "$(declare -p ENV_PARAMS)"
 }
 
-# Check if the entry exists in the configuration file
+# @description Check if the entry exists in the configuration file.
 #
-# $1 - Configuration file path.
-# $2 - Options passed to script.
-#
-# Returns nothing.
+# @arg $1 string Configuration file path.
+# @arg $2 array Options passed to script.
 check_menu_entries() {
   local menu_path_file="$1"
   # shellcheck disable=SC2124
@@ -103,13 +101,11 @@ check_menu_entries() {
   return 0
 }
 
-# Build the command with the required options.
+# @description Build the command with the required options.
 #
-# $1 - Configuration file path.
-# $2 - Show the options (Default false).
-# $3 - Options passed to script.
-#
-# Returns the generated command.
+# @arg $1 string Configuration file path.
+# @arg $2 boolean Show the options (default **false**).
+# @arg $3 array Options passed to script.
 build_mandatory_opts() {
   local menu_path_file=$1
   local show=${2:-0}
@@ -122,7 +118,6 @@ build_mandatory_opts() {
 
   # Build the mandatory options
   for opt in $opts; do
-#    echo "$opts_regex .opts .$opt .optional"
     optional=$(yq "$opts_regex .opts .$opt .optional" $menu_path_file)
     if ! [ "$optional" = "true" ]; then
       prefix=$(yq "$opts_regex .opts .$opt .prefix" $menu_path_file)
@@ -149,13 +144,11 @@ build_mandatory_opts() {
   return 0
 }
 
-# Build the command with the optional options.
+# @description Build the command with the optional options.
 #
-# $1 - Configuration file path.
-# $2 - Show the options (Default false).
-# $3 - Options passed to script.
-#
-# Returns the generated command.
+# @arg $1 string Configuration file path.
+# @arg $2 boolean Show the options (default **false**).
+# @arg $3 array Options passed to script.
 build_optional_opts() {
   local menu_path_file=$1
   local show=${2:-0}
@@ -189,13 +182,11 @@ build_optional_opts() {
   return 0
 }
 
-# Build the command with the regular expression.
+# @description Build the command with the regular expression.
 #
-# $1 - Configuration file path.
-# $2 - Show the generated command (Default false).
-# $3 - Regular expression.
-#
-# Returns the generated command.
+# @arg $1 string Configuration file path.
+# @arg $2 boolean Show the generated command (default **false**).
+# @arg $3 string A regular expression.
 build_cmd_opts() {
   local menu_path_file=$1
   local show=${2:-0}
@@ -244,10 +235,10 @@ build_cmd_opts() {
   return 0
 }
 
-# Show the help menu in standard output.
+# @description Show the help menu in standard output.
 #
-# $1 - Configuration file path.
-# $2 - Options passed to script.
+# @arg $1 string Configuration file path.
+# @arg $2 array Options passed to script.
 #
 # Returns the help menu.
 display_help() {
@@ -275,9 +266,7 @@ display_help() {
   show_message "Usage: $menu_name $cmd_options"
 }
 
-# Show the help menu in standard output with environment file.
-#
-# Returns the help menu.
+# @description Show the help menu in standard output with environment file.
 _display_help() {
   display_help $CONFIG_FOLDER/$MENU_FOLDER/$MENU_FILE "$*"
 }
