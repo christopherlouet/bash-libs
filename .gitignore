@@ -8,5 +8,8 @@
 config/*
 !config/docker_compose
 !config/menu
-env/*
+
+/env/*
+!/env/.gitkeep
+
 tests/.*

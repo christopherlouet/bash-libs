@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# @file messages.sh
+# @brief A library for display messages.
+# @description
+#     The library allows you to display custom messages.
 
 declare -A MSG_COLORS=(
   [NOCOLOR]='\033[0m'
@@ -7,12 +11,10 @@ declare -A MSG_COLORS=(
   [ORANGE]='\033[0;33m'
 )
 
-# Print a message to STDOUT. You can customize the output by specifying a level.
+# @description Print a message to STDOUT. You can customize the output by specifying a level.
 #
-# $1 - String messages that will be printed.
-# $2 - An optional level (0: info (default), >0: error, <0: warn).
-#
-# Returns the formatted message.
+# @arg $1 string Message that will be printed.
+# @arg $2 int An optional level (0: info (default), >0: error, <0: warn).
 show_message() {
   msg=$1
   level=${2:-0}
@@ -27,15 +29,18 @@ show_message() {
   echo -e "$msg_start$msg${MSG_COLORS[NOCOLOR]}"
 }
 
+# @description Print a message to STDERR.
+#
+# @arg $1 string Message that will be printed.
 die() {
     echo -e "${MSG_COLORS[RED]}$*${MSG_COLORS[NOCOLOR]}" > /dev/stderr
 }
 
-# Read a confirm message and print a response ('y','') to STDOUT.
+# @description Read a confirm message and print a response ('y','') to STDOUT.
 #
-# $1 - String messages that will be prompted.
-# $2 - Message to display if no answer is entered.
-# $3 - Expected answer, used for unit test.
+# @arg $1 string Message that will be prompted.
+# @arg $2 string Message to display if no answer is entered.
+# @arg $3 string Expected answer, used for unit test.
 #
 # Returns "y" if the user's response is "yes" or "y".
 confirm_message() {

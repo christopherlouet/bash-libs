@@ -9,7 +9,7 @@ if [ "${@: -1}" = "--force" ]; then
   EXEC_CMD=${@:1: $#-1}
 fi
 
-[[ -z $EXEC_CMD ]] && EXEC_CMD="pytest tests/test_*"
+[[ -z $EXEC_CMD ]] && EXEC_CMD="pytest tests/test_*.py"
 
 echo "Build $DOCKER_IMAGE"
 DOCKER_BUILDKIT=1 docker build --target=runtime -t=$DOCKER_IMAGE .
